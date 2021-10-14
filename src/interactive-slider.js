@@ -58,7 +58,7 @@ const processOptions = (div, userOptions) => {
     { name: "lower", default: "min", verify: verifyInput },
     { name: "value", default: "max", verify: verifyInput },
     { name: "availability", default: [], verify: verifyData },
-    { name: "barcolor", default: "#28b5f5", verify: verifyString },
+    { name: "barColor", default: "#28b5f5", verify: verifyString },
     { name: "type", default: "single", verify: verifyType },
     { name: "tooltip", default: true, verify: verifyBool },
     { name: "fontSize", default: 10, verify: verifyNumber },
@@ -67,6 +67,8 @@ const processOptions = (div, userOptions) => {
     { name: "marginBottom", default: 30, verify: verifyNumber },
     { name: "marginRight", default: 10, verify: verifyNumber },
     { name: "barHeight", default: 4, verify: verifyNumber },
+    { name: "handleHeight", default: 20, verify: verifyNumber },
+    { name: "handleWidth", default: 2, verify: verifyNumber },
     {
       name: "width",
       default: select("#" + div)
@@ -182,8 +184,8 @@ const plotAvailability = (div, x, options) => {
     .attr("width", function (d) {
       return Math.max(1, x(d[1]) - x(d[0]));
     })
-    .attr("stroke", options.barcolor)
-    .attr("fill", options.barcolor)
+    .attr("stroke", options.barColor)
+    .attr("fill", options.barColor)
     .attr("x", function (d) {
       return x(d[0]);
     })
@@ -198,12 +200,12 @@ const addFocus = (div, svg, x, options) => {
   focus
     .append("rect")
     .attr("id", "focushandle_" + div)
-    .attr("height", 18)
+    .attr("height", 0.9 * options.handleHeight)
     .attr("width", 0.2)
     .style("fill", "#989c9e")
     .attr("stroke", "#989c9e")
     .attr("x", x(options.min))
-    .attr("y", options.height - 9)
+    .attr("y", options.height - 0.45 * options.handleHeight)
     .style("opacity", 0);
 };
 
@@ -215,10 +217,13 @@ const addHandles = (div, svg, x, options) => {
     var id = select(this).attr("id");
     if (id === "handles-lower_" + div && event.x < x(options.upper)) {
       select(this).attr("x", event.x);
+      plotTooltip(div, x, event, options);
     } else if (id === "handles-upper_" + div && event.x > x(options.lower)) {
       select(this).attr("x", event.x);
+      plotTooltip(div, x, event, options);
     } else if (id === "handles-value_" + div) {
       select(this).attr("x", event.x);
+      plotTooltip(div, x, event, options);
     }
   }
   function dragended(event) {
@@ -267,30 +272,60 @@ const plotHandles = (div, drag, x, options) => {
     handles
       .append("rect")
       .attr("id", "handles-value_" + div)
+      .attr("class", "interactive-slider-handles")
       .attr("cursor", "pointer")
-      .attr("height", 20)
-      .attr("width", 2)
+      .attr("height", options.handleHeight)
+      .attr("width", options.handleWidth)
       .attr("x", x(options.value))
-      .attr("y", options.height - 9)
+      .attr("y", options.height - 1 - options.handleHeight / 2)
+      .on("mouseover", function (event) {
+        mouseover(event, div, options);
+      })
+      .on("mousemove", function (event) {
+        mousemove(event, div, x, options);
+      })
+      .on("mouseout", function () {
+        mouseout(div);
+      })
       .call(drag);
   } else if (options.type === "double") {
     handles
       .append("rect")
       .attr("id", "handles-lower_" + div)
+      .attr("class", "interactive-slider-handles")
       .attr("cursor", "pointer")
-      .attr("height", 20)
-      .attr("width", 2)
+      .attr("height", options.handleHeight)
+      .attr("width", options.handleWidth)
       .attr("x", x(options.lower))
-      .attr("y", options.height - 9)
+      .attr("y", options.height - 1 - options.handleHeight / 2)
+      .on("mouseover", function (event) {
+        mouseover(event, div, options);
+      })
+      .on("mousemove", function (event) {
+        mousemove(event, div, x, options);
+      })
+      .on("mouseout", function () {
+        mouseout(div);
+      })
       .call(drag);
     handles
       .append("rect")
       .attr("id", "handles-upper_" + div)
+      .attr("class", "interactive-slider-handles")
       .attr("cursor", "pointer")
-      .attr("height", 20)
-      .attr("width", 2)
+      .attr("height", options.handleHeight)
+      .attr("width", options.handleWidth)
       .attr("x", x(options.upper))
-      .attr("y", options.height - 9)
+      .attr("y", options.height - 1 - options.handleHeight / 2)
+      .on("mouseover", function (event) {
+        mouseover(event, div, options);
+      })
+      .on("mousemove", function (event) {
+        mousemove(event, div, x, options);
+      })
+      .on("mouseout", function () {
+        mouseout(div);
+      })
       .call(drag);
   }
 };

@@ -20,10 +20,6 @@ export const verifyBool = (bool) => {
   return typeof bool === "boolean";
 };
 
-export const verifyColors = (colors) => {
-  return true;
-};
-
 export const verifyFunction = (f) => {
   return typeof f === "function";
 };
