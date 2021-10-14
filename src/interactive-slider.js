@@ -1,13 +1,10 @@
 import {
   select,
-  extent,
   scaleTime,
   scaleLinear,
   axisBottom,
-  symbol,
-  symbolTriangle,
-  zoomIdentity,
-  range,
+  pointer,
+  drag as d3drag,
   zoom as d3zoom,
   timeFormatDefaultLocale,
 } from "d3";
@@ -15,7 +12,6 @@ import {
   verifyString,
   verifyBool,
   verifyNumber,
-  verifyColors,
   verifyDiv,
   verifyData,
   verifyFunction,
@@ -32,18 +28,20 @@ const slider = (div, options = {}) => {
   try {
     verifyDiv(div);
     options = processOptions(div, options);
-    console.log(options);
+    timeFormatDefaultLocale(languageOptions(options.language));
 
     const svg = addSVG(div, options);
-    timeFormatDefaultLocale(languageOptions(options.language));
-    var Axis = xAxis(svg, options);
+    var Axis = xAxis(options);
 
-    const plotBars = plotAvailability(div, svg, Axis.ax, options);
-    plotBars();
+    addAvailability(div, svg);
+    var gX = addAxis(div, svg, Axis.axis, options);
+    addFocus(div, svg, Axis.ax, options);
+    addTooltip(div, options);
+    addEventbox(div, svg, Axis, gX, options);
+    const drag = addHandles(div, svg, Axis.ax, options);
 
-    Axis.g = plotAxis(svg, Axis.axis, options);
-    
-    var focushandle = addFocus(svg, Axis.axis, options);
+    plotAvailability(div, Axis.ax, options);
+    plotHandles(div, drag, Axis.ax, options);
   } catch (e) {
     console.error(e);
   }
@@ -51,6 +49,8 @@ const slider = (div, options = {}) => {
 
 const processOptions = (div, userOptions) => {
   var defaultOptions = [
+    { name: "onChange", default: false, verify: verifyFunction },
+    { name: "onZoom", default: false, verify: verifyFunction },
     { name: "language", default: "en", verify: verifyString },
     { name: "min", default: 0, verify: verifyInput },
     { name: "max", default: 1, verify: verifyInput },
@@ -60,12 +60,12 @@ const processOptions = (div, userOptions) => {
     { name: "availability", default: [], verify: verifyData },
     { name: "barcolor", default: "#28b5f5", verify: verifyString },
     { name: "type", default: "single", verify: verifyType },
-    { name: "showtooltip", default: true, verify: verifyBool },
+    { name: "tooltip", default: true, verify: verifyBool },
     { name: "fontSize", default: 10, verify: verifyNumber },
     { name: "marginTop", default: 25, verify: verifyNumber },
-    { name: "marginLeft", default: 2, verify: verifyNumber },
+    { name: "marginLeft", default: 10, verify: verifyNumber },
     { name: "marginBottom", default: 30, verify: verifyNumber },
-    { name: "marginRight", default: 2, verify: verifyNumber },
+    { name: "marginRight", default: 10, verify: verifyNumber },
     { name: "barHeight", default: 4, verify: verifyNumber },
     {
       name: "width",
@@ -110,7 +110,7 @@ const processOptions = (div, userOptions) => {
 };
 
 const addSVG = (div, options) => {
-  return select("#" + div)
+  var svg = select("#" + div)
     .append("svg")
     .attr("id", "svg_" + div)
     .attr("width", options.width + options.marginLeft + options.marginRight)
@@ -119,20 +119,32 @@ const addSVG = (div, options) => {
     .attr(
       "transform",
       "translate(" + options.marginLeft + "," + options.marginTop + ")"
-    );
+    )
+    .attr("width", options.width);
+
+  svg
+    .append("defs")
+    .append("svg:clipPath")
+    .attr("id", "clip_" + div)
+    .append("svg:rect")
+    .attr("width", options.width)
+    .attr("height", options.height + options.marginBottom + options.marginTop)
+    .attr("x", 0)
+    .attr("y", 0);
+  return svg;
 };
 
-const plotAxis = (svg, axis, options) => {
+const addAxis = (div, svg, axis, options) => {
   return svg
     .append("g")
-    .attr("class", "xaxis")
-    .attr("id", "axis--x")
+    .attr("class", "interactive-slider-xaxis")
+    .attr("id", "xAxis_" + div)
     .style("font-size", `${options.fontSize}px`)
     .attr("transform", "translate(0," + options.height + ")")
     .call(axis);
 };
 
-const xAxis = (svg, options) => {
+const xAxis = (options) => {
   var ax;
   if (options.min instanceof Date) {
     ax = scaleTime()
@@ -149,45 +161,312 @@ const xAxis = (svg, options) => {
   return { ax, ref, base, axis };
 };
 
-const plotAvailability = (div, svg, x, options) => {
-  var bars = svg
+const addAvailability = (div, svg) => {
+  svg
     .append("g")
-    .attr("class", "bars")
-    .attr("id", "bars_" + div);
-  function plotBars() {
-    select("#bars_" + div)
-      .selectAll("*")
-      .remove();
-    bars
-      .selectAll("dot")
-      .data(options.availability)
-      .enter()
-      .append("rect")
-      .attr("height", options.barHeight)
-      .attr("width", function (d) {
-        return Math.max(1, x(d[1]) - x(d[0]));
-      })
-      .attr("stroke", options.barcolor)
-      .attr("fill", options.barcolor)
-      .attr("x", function (d) {
-        return x(d[0]);
-      })
-      .attr("y", options.height - options.barHeight / 2);
-  }
-  return plotBars;
+    .attr("class", "interactive-slider-availability")
+    .attr("id", "availability_" + div)
+    .attr("clip-path", "url(#clip_" + div + ")");
 };
 
-const addFocus = (svg, x, options) => {
-  var focus = svg.append("g").attr("class", "focus").attr("id", "focus");
-  return focus
+const plotAvailability = (div, x, options) => {
+  select("#availability_" + div)
+    .selectAll("*")
+    .remove();
+  select("#availability_" + div)
+    .selectAll("dot")
+    .data(options.availability)
+    .enter()
     .append("rect")
+    .attr("height", options.barHeight)
+    .attr("width", function (d) {
+      return Math.max(1, x(d[1]) - x(d[0]));
+    })
+    .attr("stroke", options.barcolor)
+    .attr("fill", options.barcolor)
+    .attr("x", function (d) {
+      return x(d[0]);
+    })
+    .attr("y", options.height - options.barHeight / 2);
+};
+
+const addFocus = (div, svg, x, options) => {
+  var focus = svg
+    .append("g")
+    .attr("class", "interactive-slider-focus")
+    .attr("id", "focus_" + div);
+  focus
+    .append("rect")
+    .attr("id", "focushandle_" + div)
     .attr("height", 18)
     .attr("width", 0.2)
     .style("fill", "#989c9e")
     .attr("stroke", "#989c9e")
     .attr("x", x(options.min))
-    .attr("y", -8)
+    .attr("y", options.height - 9)
     .style("opacity", 0);
+};
+
+const addHandles = (div, svg, x, options) => {
+  function dragstarted() {
+    select("#focus_" + div).style("opacity", 0);
+  }
+  function dragged(event) {
+    var id = select(this).attr("id");
+    if (id === "handles-lower_" + div && event.x < x(options.upper)) {
+      select(this).attr("x", event.x);
+    } else if (id === "handles-upper_" + div && event.x > x(options.lower)) {
+      select(this).attr("x", event.x);
+    } else if (id === "handles-value_" + div) {
+      select(this).attr("x", event.x);
+    }
+  }
+  function dragended(event) {
+    select("#focus_" + div).style("opacity", 1);
+    try {
+      var id = select(this).attr("id");
+      var v = x.invert(select("#" + id).attr("x"));
+      if (id === "handles-lower_" + div) {
+        options.lower = v;
+        if (options.onChange) {
+          options.onChange([v, options.upper]);
+        }
+      } else if (id === "handles-upper_" + div) {
+        options.upper = v;
+        if (options.onChange) {
+          options.onChange([options.lower, v]);
+        }
+      } else if (id === "handles-value_" + div) {
+        options.value = v;
+        if (options.onChange) {
+          options.onChange([v]);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  svg
+    .append("g")
+    .attr("class", "interactive-slider-handles")
+    .attr("id", "handles_" + div);
+
+  var drag = d3drag()
+    .on("start", dragstarted)
+    .on("drag", dragged)
+    .on("end", dragended);
+
+  return drag;
+};
+
+const plotHandles = (div, drag, x, options) => {
+  var handles = select("#handles_" + div);
+  handles.selectAll("*").remove();
+  if (options.type === "single") {
+    handles
+      .append("rect")
+      .attr("id", "handles-value_" + div)
+      .attr("cursor", "pointer")
+      .attr("height", 20)
+      .attr("width", 2)
+      .attr("x", x(options.value))
+      .attr("y", options.height - 9)
+      .call(drag);
+  } else if (options.type === "double") {
+    handles
+      .append("rect")
+      .attr("id", "handles-lower_" + div)
+      .attr("cursor", "pointer")
+      .attr("height", 20)
+      .attr("width", 2)
+      .attr("x", x(options.lower))
+      .attr("y", options.height - 9)
+      .call(drag);
+    handles
+      .append("rect")
+      .attr("id", "handles-upper_" + div)
+      .attr("cursor", "pointer")
+      .attr("height", 20)
+      .attr("width", 2)
+      .attr("x", x(options.upper))
+      .attr("y", options.height - 9)
+      .call(drag);
+  }
+};
+
+const moveHandles = (div, x, options) => {
+  if (options.type === "single") {
+    select("#handles-value_" + div).attr("x", x(options.value));
+  } else if (options.type === "double") {
+    select("#handles-lower_" + div).attr("x", x(options.lower));
+    select("#handles-upper_" + div).attr("x", x(options.upper));
+  }
+};
+
+const addTooltip = (div, options) => {
+  select("#" + div)
+    .append("div")
+    .attr("id", "tooltip_" + div)
+    .style("font-size", `${options.fontSize}px`)
+    .style("position", "absolute")
+    .style("bottom", options.marginBottom + options.height + "px")
+    .style("left", options.marginLeft)
+    .attr("class", "interactive-slider-tooltip");
+};
+
+const plotTooltip = (div, x, event, options) => {
+  try {
+    var tooltip = select("#tooltip_" + div);
+    tooltip.html(tooltipText(x.invert(pointer(event)[0]), options));
+    let tooltipwidth = tooltip.node().getBoundingClientRect().width;
+    tooltip.style(
+      "left",
+      Math.max(
+        Math.min(
+          options.width - tooltipwidth,
+          pointer(event)[0] - tooltipwidth / 2
+        ),
+        0
+      ) +
+        options.marginLeft +
+        "px"
+    );
+  } catch (e) {}
+};
+
+const tooltipText = (text, options) => {
+  var months = languageOptions(options.language).shortMonths;
+  if (text instanceof Date) {
+    return `${text.getHours() < 10 ? "0" + text.getHours() : text.getHours()}:${
+      text.getMinutes() < 10 ? "0" + text.getMinutes() : text.getMinutes()
+    } ${text.getDate()}-${months[text.getMonth()]} ${text.getFullYear()}`;
+  } else {
+    return Math.round(text * 1000) / 1000;
+  }
+};
+
+const addEventbox = (div, svg, Axis, gX, options) => {
+  var zoom = d3zoom()
+    .extent([
+      [0, 0],
+      [options.width, options.height],
+    ])
+    .on("zoom", function (event) {
+      zoomed(event, div, Axis.ax, Axis.ref, gX, Axis.axis, options);
+    })
+    .on("end", function (event) {
+      zoomEnd(event, Axis.ax);
+    });
+
+  var eventbox = svg
+    .append("rect")
+    .attr("id", "eventbox_" + div)
+    .attr("width", options.width)
+    .attr("height", options.height + options.marginTop + options.marginBottom)
+    .style("fill", "none")
+    .style("cursor", "pointer")
+    .attr("y", -options.marginTop)
+    .attr("pointer-events", "all")
+    .call(zoom);
+
+  eventbox
+    .on("dblclick.zoom", null)
+    .on("mouseover", function (event) {
+      mouseover(event, div, options);
+    })
+    .on("mousemove", function (event) {
+      mousemove(event, div, Axis.ax, options);
+    })
+    .on("mouseout", function () {
+      mouseout(div);
+    })
+    .on("click", function (event) {
+      onclick(event, div, Axis.ax, options);
+    });
+};
+
+const zoomEnd = (event, x) => {
+  if (event) {
+    if (options.onZoom) {
+      options.onZoom(x.domain());
+    }
+  }
+};
+
+const zoomed = (event, div, x, ref, gX, axis, options) => {
+  if (event) {
+    let d = event.transform.rescaleX(ref).domain();
+    x.domain(d);
+  }
+  gX.call(axis);
+  plotAvailability(div, x, options);
+  moveHandles(div, x, options);
+};
+
+const onclick = (event, div, x, options) => {
+  if (options.type === "single") {
+    select("#handles-value_" + div).attr(
+      "x",
+      event.layerX - options.marginLeft
+    );
+    options.value = x.invert(event.layerX - options.marginLeft);
+    if (options.onChange) {
+      options.onChange([options.value]);
+    }
+  } else if (options.type === "double") {
+    var xu = Math.abs(event.layerX - x(options.upper));
+    var xl = Math.abs(event.layerX - x(options.lower));
+    if (xu <= xl) {
+      select("#handles-upper_" + div).attr(
+        "x",
+        event.layerX - options.marginLeft
+      );
+      options.upper = x.invert(event.layerX - options.marginLeft);
+      if (options.onChange) {
+        options.onChange([options.lower, options.upper]);
+      }
+    } else if (xl < xu) {
+      select("#handles-lower_" + div).attr(
+        "x",
+        event.layerX - options.marginLeft
+      );
+      options.lower = x.invert(event.layerX - options.marginLeft);
+      if (options.onChange) {
+        options.onChange([options.lower, options.upper]);
+      }
+    }
+  }
+};
+
+const mouseover = (event, div, options) => {
+  try {
+    var focushandle = select("#focushandle_" + div);
+    focushandle.attr("x", pointer(event)[0]);
+    focushandle.style("opacity", 1);
+    if (options.tooltip) {
+      select("#tooltip_" + div).style("visibility", "visible");
+    }
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const mousemove = (event, div, x, options) => {
+  try {
+    var focushandle = select("#focushandle_" + div);
+    focushandle.attr("x", pointer(event)[0]);
+  } catch (e) {}
+  try {
+    plotTooltip(div, x, event, options);
+  } catch (e) {}
+};
+
+const mouseout = (div) => {
+  try {
+    select("#focushandle_" + div).style("opacity", 0);
+    select("#tooltip_" + div).style("visibility", "hidden");
+  } catch (e) {}
 };
 
 export default slider;
