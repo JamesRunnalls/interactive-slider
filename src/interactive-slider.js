@@ -440,33 +440,52 @@ const zoomed = (event, div, x, ref, gX, axis, options) => {
 };
 
 const onclick = (event, div, x, options) => {
+  var value = x.invert(event.layerX - options.marginLeft);
   if (options.type === "single") {
     select("#handles-value_" + div).attr(
       "x",
       event.layerX - options.marginLeft
     );
-    options.value = x.invert(event.layerX - options.marginLeft);
+    options.value = value;
     if (options.onChange) {
       options.onChange([options.value]);
     }
   } else if (options.type === "double") {
-    var xu = Math.abs(event.layerX - x(options.upper));
-    var xl = Math.abs(event.layerX - x(options.lower));
-    if (xu <= xl) {
-      select("#handles-upper_" + div).attr(
-        "x",
-        event.layerX - options.marginLeft
-      );
-      options.upper = x.invert(event.layerX - options.marginLeft);
-      if (options.onChange) {
-        options.onChange([options.lower, options.upper]);
-      }
-    } else if (xl < xu) {
+    if (value <= options.lower) {
       select("#handles-lower_" + div).attr(
         "x",
         event.layerX - options.marginLeft
       );
-      options.lower = x.invert(event.layerX - options.marginLeft);
+      options.lower = value;
+      if (options.onChange) {
+        options.onChange([options.lower, options.upper]);
+      }
+    } else if (value >= options.upper) {
+      select("#handles-upper_" + div).attr(
+        "x",
+        event.layerX - options.marginLeft
+      );
+      options.upper = value;
+      if (options.onChange) {
+        options.onChange([options.lower, options.upper]);
+      }
+    } else if (
+      Math.abs(value - options.lower) > Math.abs(value - options.upper)
+    ) {
+      select("#handles-upper_" + div).attr(
+        "x",
+        event.layerX - options.marginLeft
+      );
+      options.upper = value;
+      if (options.onChange) {
+        options.onChange([options.lower, options.upper]);
+      }
+    } else {
+      select("#handles-lower_" + div).attr(
+        "x",
+        event.layerX - options.marginLeft
+      );
+      options.lower = value;
       if (options.onChange) {
         options.onChange([options.lower, options.upper]);
       }
