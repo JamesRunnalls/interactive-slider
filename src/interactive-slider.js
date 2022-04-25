@@ -84,7 +84,7 @@ const processOptions = (div, userOptions) => {
       if (defaultOptions[i].verify(userOptions[defaultOptions[i].name])) {
         options[defaultOptions[i].name] = userOptions[defaultOptions[i].name];
       } else {
-        console.error(
+        console.warn(
           `${userOptions[defaultOptions[i].name]} is not a valid input for ${
             defaultOptions[i].name
           }`
@@ -132,6 +132,16 @@ const addSVG = (div, options) => {
     .attr("width", options.width)
     .attr("height", options.height + options.marginBottom + options.marginTop)
     .attr("x", 0)
+    .attr("y", 0);
+
+  svg
+    .append("defs")
+    .append("svg:clipPath")
+    .attr("id", "cliphandle_" + div)
+    .append("svg:rect")
+    .attr("width", options.width + options.handleWidth * 2)
+    .attr("height", options.height + options.marginBottom + options.marginTop)
+    .attr("x", -options.handleWidth)
     .attr("y", 0);
   return svg;
 };
@@ -255,7 +265,8 @@ const addHandles = (div, svg, x, options) => {
   svg
     .append("g")
     .attr("class", "interactive-slider-handles")
-    .attr("id", "handles_" + div);
+    .attr("id", "handles_" + div)
+    .attr("clip-path", "url(#cliphandle_" + div + ")");
 
   var drag = d3drag()
     .on("start", dragstarted)
@@ -391,7 +402,7 @@ const addEventbox = (div, svg, Axis, gX, options) => {
       zoomed(event, div, Axis.ax, Axis.ref, gX, Axis.axis, options);
     })
     .on("end", function (event) {
-      zoomEnd(event, Axis.ax);
+      zoomEnd(event, Axis.ax, options);
     });
 
   var eventbox = svg
@@ -421,7 +432,7 @@ const addEventbox = (div, svg, Axis, gX, options) => {
     });
 };
 
-const zoomEnd = (event, x) => {
+const zoomEnd = (event, x, options) => {
   if (event) {
     if (options.onZoom) {
       options.onZoom(x.domain());
