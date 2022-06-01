@@ -227,13 +227,13 @@ const addHandles = (div, svg, x, options) => {
     var id = select(this).attr("id");
     if (id === "handles-lower_" + div && event.x < x(options.upper)) {
       select(this).attr("x", event.x);
-      plotTooltip(div, x, event, options);
+      plotTooltip(div, x, event, options, drag = true);
     } else if (id === "handles-upper_" + div && event.x > x(options.lower)) {
       select(this).attr("x", event.x);
-      plotTooltip(div, x, event, options);
+      plotTooltip(div, x, event, options, drag = true);
     } else if (id === "handles-value_" + div) {
       select(this).attr("x", event.x);
-      plotTooltip(div, x, event, options);
+      plotTooltip(div, x, event, options, drag = true);
     }
   }
   function dragended(event) {
@@ -361,18 +361,16 @@ const addTooltip = (div, options) => {
     .attr("class", "interactive-slider-tooltip");
 };
 
-const plotTooltip = (div, x, event, options) => {
+const plotTooltip = (div, x, event, options, drag = false) => {
   try {
     var tooltip = select("#tooltip_" + div);
-    tooltip.html(tooltipText(x.invert(pointer(event)[0]), options));
+    var e = drag ? event.x : pointer(event)[0];
+    tooltip.html(tooltipText(x.invert(e), options));
     let tooltipwidth = tooltip.node().getBoundingClientRect().width;
     tooltip.style(
       "left",
       Math.max(
-        Math.min(
-          options.width - tooltipwidth,
-          pointer(event)[0] - tooltipwidth / 2
-        ),
+        Math.min(options.width - tooltipwidth, e - tooltipwidth / 2),
         0
       ) +
         options.marginLeft +
