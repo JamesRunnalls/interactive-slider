@@ -8,7 +8,7 @@ export const languageOptions = (name) => {
       dateTime: "%a %b %e %X %Y",
       date: "%d.%m.%Y",
       time: "%H:%M:%S",
-      periods: ["AM", "PM"],
+      periods: ['Vormittag', 'Nachmittag'],
       days: [
         "Sonntag",
         "Montag",
