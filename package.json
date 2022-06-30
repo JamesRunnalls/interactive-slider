@@ -1,6 +1,6 @@
 {
   "name": "interactive-slider",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Zoom compatible interactive slider, for dates and number. Easily display data availablity.",
   "main": "src/index.js",
   "unpkg": "dist/interactive-slider.min.js",

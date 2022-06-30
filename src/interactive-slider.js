@@ -4,6 +4,14 @@ import {
   scaleLinear,
   axisBottom,
   pointer,
+  timeFormat,
+  timeSecond,
+  timeMinute,
+  timeHour,
+  timeDay,
+  timeMonth,
+  timeYear,
+  timeWeek,
   drag as d3drag,
   zoom as d3zoom,
   timeFormatDefaultLocale,
@@ -170,6 +178,9 @@ const xAxis = (options) => {
   var ref = ax.copy();
   var base = ax.copy();
   var axis = axisBottom(ax).ticks(4).tickPadding(10);
+  if (options.min instanceof Date) {
+    axis.tickFormat(multiFormat);
+  }
   return { ax, ref, base, axis };
 };
 
@@ -530,6 +541,34 @@ const mouseout = (div) => {
     select("#focushandle_" + div).style("opacity", 0);
     select("#tooltip_" + div).style("visibility", "hidden");
   } catch (e) {}
+};
+
+const multiFormat = (date) => {
+  var formatMillisecond = timeFormat(".%L"),
+    formatSecond = timeFormat(":%S"),
+    formatMinute = timeFormat("%H:%M"),
+    formatHour = timeFormat("%H:%M"),
+    formatDay = timeFormat("%a %d"),
+    formatWeek = timeFormat("%b %d"),
+    formatMonth = timeFormat("%B"),
+    formatYear = timeFormat("%Y");
+  return (
+    timeSecond(date) < date
+      ? formatMillisecond
+      : timeMinute(date) < date
+      ? formatSecond
+      : timeHour(date) < date
+      ? formatMinute
+      : timeDay(date) < date
+      ? formatHour
+      : timeMonth(date) < date
+      ? timeWeek(date) < date
+        ? formatDay
+        : formatWeek
+      : timeYear(date) < date
+      ? formatMonth
+      : formatYear
+  )(date);
 };
 
 export default slider;
