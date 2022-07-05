@@ -238,13 +238,13 @@ const addHandles = (div, svg, x, options) => {
     var id = select(this).attr("id");
     if (id === "handles-lower_" + div && event.x < x(options.upper)) {
       select(this).attr("x", event.x);
-      plotTooltip(div, x, event, options, drag = true);
+      plotTooltip(div, x, event, options, (drag = true));
     } else if (id === "handles-upper_" + div && event.x > x(options.lower)) {
       select(this).attr("x", event.x);
-      plotTooltip(div, x, event, options, drag = true);
+      plotTooltip(div, x, event, options, (drag = true));
     } else if (id === "handles-value_" + div) {
       select(this).attr("x", event.x);
-      plotTooltip(div, x, event, options, drag = true);
+      plotTooltip(div, x, event, options, (drag = true));
     }
   }
   function dragended(event) {
@@ -548,8 +548,8 @@ const multiFormat = (date) => {
     formatSecond = timeFormat(":%S"),
     formatMinute = timeFormat("%H:%M"),
     formatHour = timeFormat("%H:%M"),
-    formatDay = timeFormat("%a %d"),
-    formatWeek = timeFormat("%b %d"),
+    formatDay = timeFormat("%d.%m"),
+    formatWeek = timeFormat("%d.%m"),
     formatMonth = timeFormat("%B"),
     formatYear = timeFormat("%Y");
   return (
